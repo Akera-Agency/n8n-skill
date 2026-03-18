@@ -1,0 +1,162 @@
+---
+name: n8n
+description: Manage n8n workflows, executions, and nodes via the n8n REST API and n8n-as-code CLI. Use when creating, editing, pulling, pushing, listing, debugging, or monitoring n8n workflows. Also for searching n8n nodes/templates, checking execution logs, diagnosing failed runs, triggering webhooks, or any n8n automation task. Triggers on mentions of n8n, workflow automation, n8n-as-code, n8nac, or webhook workflows.
+---
+
+# n8n Skill
+
+Manage n8n workflows through the n8n REST API and n8n-as-code (n8nac) CLI.
+
+## Prerequisites
+
+- n8n instance with API access enabled
+- API key stored at `~/clawd/credentials/n8n-api-key.txt`
+- n8n host URL stored at `~/clawd/credentials/n8n-host.txt`
+- n8nac CLI: `npx --yes n8nac <command>`
+
+## Quick Reference
+
+### Auth Setup
+
+```bash
+N8N_HOST=$(cat ~/clawd/credentials/n8n-host.txt)
+N8N_API_KEY=$(cat ~/clawd/credentials/n8n-api-key.txt)
+```
+
+All API calls use header: `X-N8N-API-KEY: $N8N_API_KEY`
+
+### Common Operations
+
+| Task | Method |
+|------|--------|
+| List workflows | `GET /api/v1/workflows` |
+| Get workflow | `GET /api/v1/workflows/{id}` |
+| Create workflow | `POST /api/v1/workflows` |
+| Update workflow | `PUT /api/v1/workflows/{id}` (full body required) |
+| Delete workflow | `DELETE /api/v1/workflows/{id}` |
+| List executions | `GET /api/v1/executions` |
+| Get execution detail | `GET /api/v1/executions/{id}` |
+| Delete execution | `DELETE /api/v1/executions/{id}` |
+
+### n8nac CLI Commands
+
+```bash
+npx --yes n8nac init                    # Connect to n8n instance
+npx --yes n8nac list                    # List workflows with sync status
+npx --yes n8nac pull <id>               # Pull workflow to local TypeScript
+npx --yes n8nac push <file>             # Push local workflow to n8n
+npx --yes n8nac update-ai               # Regenerate AI context
+npx --yes n8nac skills search "<query>" # Search nodes and templates
+npx --yes n8nac skills node-info <node> # Full schema for a node
+npx --yes n8nac skills examples search "<query>"  # Search 7,702 templates
+npx --yes n8nac skills validate <file>  # Validate workflow before deploy
+npx --yes n8nac convert <file> --format typescript  # JSON → TypeScript
+npx --yes n8nac convert <file> --format json        # TypeScript → JSON
+```
+
+## Workflow Patterns
+
+### List & Filter Workflows
+
+```bash
+# All workflows
+curl -s "$N8N_HOST/api/v1/workflows" -H "X-N8N-API-KEY: $N8N_API_KEY" | jq '.data[] | {id, name, active}'
+
+# Active only
+curl -s "$N8N_HOST/api/v1/workflows?active=true" -H "X-N8N-API-KEY: $N8N_API_KEY" | jq '.data[] | {id, name}'
+```
+
+### Debug Failed Executions
+
+```bash
+# List failed executions
+curl -s "$N8N_HOST/api/v1/executions?status=error&limit=10" \
+  -H "X-N8N-API-KEY: $N8N_API_KEY" | jq '.data[] | {id, workflowId: .workflowData.name, finished, stoppedAt}'
+
+# Get error details for a specific execution
+curl -s "$N8N_HOST/api/v1/executions/{id}" \
+  -H "X-N8N-API-KEY: $N8N_API_KEY" | jq '.data.resultData.runData | to_entries[] | select(.value[0].error) | {node: .key, error: .value[0].error.message}'
+```
+
+### Create a Workflow
+
+```bash
+curl -s -X POST "$N8N_HOST/api/v1/workflows" \
+  -H "X-N8N-API-KEY: $N8N_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Workflow",
+    "nodes": [...],
+    "connections": {...},
+    "settings": {}
+  }'
+```
+
+### Trigger via Webhook
+
+Workflows with Webhook nodes expose endpoints at:
+`$N8N_HOST/webhook/<path>` (production) or `$N8N_HOST/webhook-test/<path>` (test)
+
+```bash
+curl -s -X POST "$N8N_HOST/webhook/my-path" \
+  -H "Content-Type: application/json" \
+  -d '{"key": "value"}'
+```
+
+## API Limitations
+
+- `active` field is **read-only** — cannot activate/deactivate via API
+- `tags` are read-only on create/update
+- No PATCH — updates require full PUT with all nodes
+- No direct "run workflow" endpoint — use Webhook triggers
+- Pagination: max 250 per page, use `cursor` param for next page
+
+## TypeScript Workflow Format
+
+n8nac converts JSON workflows to TypeScript with decorators — much better for AI editing:
+
+```typescript
+import { workflow, node, links } from '@n8n-as-code/transformer';
+
+@workflow({ id: 'abc', name: 'My Flow', active: true })
+export class MyFlow {
+  @node()
+  Webhook = {
+    type: 'n8n-nodes-base.webhook',
+    parameters: { path: '/notify', method: 'POST' },
+    position: [250, 300]
+  };
+
+  @node()
+  Slack = {
+    type: 'n8n-nodes-base.slack',
+    parameters: { resource: 'message', operation: 'post', channel: '#alerts', text: '={{ $json.message }}' },
+    position: [450, 300]
+  };
+
+  @links([{ from: 'Webhook', to: 'Slack' }])
+  connections = {};
+}
+```
+
+## Debugging Playbook
+
+1. List failed executions → identify the workflow and node that errored
+2. Read execution detail → extract error message and input data
+3. Search n8nac for the failing node type → check correct parameters
+4. Pull the workflow → fix the issue in TypeScript
+5. Validate → push back to n8n
+
+## Advanced: Self-Healing Pattern
+
+For automated error recovery:
+1. Poll `GET /api/v1/executions?status=error` on a schedule
+2. For each failure, extract error details from execution data
+3. Analyze error type (auth expired, schema mismatch, rate limit, etc.)
+4. Modify workflow JSON/TS to fix the issue
+5. Push the fix and re-trigger via webhook
+
+## Reference Files
+
+- **API reference details**: See `references/api-reference.md` for full endpoint documentation
+- **Node search patterns**: Use `npx --yes n8nac skills search` for real-time node lookups
