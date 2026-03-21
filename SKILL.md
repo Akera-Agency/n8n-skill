@@ -156,6 +156,40 @@ For automated error recovery:
 4. Modify workflow JSON/TS to fix the issue
 5. Push the fix and re-trigger via webhook
 
+## Backup System
+
+Every workflow modification should be backed up first. Backups are stored in **three places**:
+
+1. **n8n instance** — as `[BACKUP] Workflow Name - timestamp` (visible in UI)
+2. **Local disk** — `~/clawd/backups/n8n/{workflow-id}/{timestamp}.json`
+3. **Git** — committed to Akera-Agency/n8n-skill repo
+
+### Backup Commands
+
+```bash
+# Backup before making changes
+bash skills/n8n/scripts/n8n-backup.sh backup <workflow-id> "reason"
+
+# Or via the API wrapper
+bash skills/n8n/scripts/n8n-api.sh backup <workflow-id> "reason"
+
+# List backups
+bash skills/n8n/scripts/n8n-api.sh backup-list <workflow-id>
+
+# Rollback to latest backup
+bash skills/n8n/scripts/n8n-api.sh rollback <workflow-id>
+
+# Rollback to specific timestamp
+bash skills/n8n/scripts/n8n-api.sh rollback <workflow-id> 2026-03-21T18-17-44Z
+
+# Cleanup old n8n backups (keep 5 most recent)
+bash skills/n8n/scripts/n8n-api.sh backup-cleanup <workflow-id> 5
+```
+
+### Auto-Backup Rule
+
+**ALWAYS backup before modifying any workflow.** The backup script saves to both n8n (visible in UI) and local disk (for fast rollback). Pre-rollback safety backups are created automatically.
+
 ## Reference Files
 
 - **API reference details**: See `references/api-reference.md` for full endpoint documentation

@@ -116,6 +116,26 @@ case "$cmd" in
     curl -sf -X POST "$N8N_HOST/webhook/$WEBHOOK_PATH" -H "Content-Type: application/json" -d "$BODY"
     ;;
 
+  backup)
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    exec "$SCRIPT_DIR/n8n-backup.sh" backup "$@"
+    ;;
+
+  rollback)
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    exec "$SCRIPT_DIR/n8n-backup.sh" rollback "$@"
+    ;;
+
+  backup-list)
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    exec "$SCRIPT_DIR/n8n-backup.sh" list "$@"
+    ;;
+
+  backup-cleanup)
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    exec "$SCRIPT_DIR/n8n-backup.sh" cleanup "$@"
+    ;;
+
   help|*)
     echo "n8n API wrapper"
     echo ""
@@ -130,5 +150,11 @@ case "$cmd" in
     echo "  update-workflow <id> <json>     Update from JSON file"
     echo "  delete-workflow <id>            Delete workflow"
     echo "  trigger <path> [json-body]      Trigger webhook"
+    echo ""
+    echo "Backup commands:"
+    echo "  backup <id> [label]             Backup to n8n + local disk"
+    echo "  rollback <id> [timestamp]       Restore from backup"
+    echo "  backup-list <id>                List all backups"
+    echo "  backup-cleanup <id> [keep=5]    Remove old n8n backups"
     ;;
 esac
