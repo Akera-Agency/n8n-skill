@@ -190,6 +190,81 @@ bash skills/n8n/scripts/n8n-api.sh backup-cleanup <workflow-id> 5
 
 **ALWAYS backup before modifying any workflow.** The backup script saves to both n8n (visible in UI) and local disk (for fast rollback). Pre-rollback safety backups are created automatically.
 
+## Data Handling Best Practices
+
+### Use Native Nodes Over Code Nodes
+
+**Always prefer native n8n nodes over Code nodes** for common operations. Native nodes are:
+- Cleaner and more maintainable
+- Better error handling
+- Easier to debug in the UI
+- More performant
+
+### Splitting Arrays into Items
+
+❌ **Don't** use Code node to split arrays:
+```javascript
+// Avoid this pattern
+return items.map(item => ({ json: { word: item } }));
+```
+
+✅ **Do** use the **Split Out** node:
+```json
+{
+  "type": "n8n-nodes-base.splitOut",
+  "parameters": {
+    "fieldToSplitOut": "words",
+    "options": {}
+  }
+}
+```
+
+### Aggregating Items into Array
+
+❌ **Don't** use Code node to aggregate:
+```javascript
+// Avoid this pattern
+const allItems = $input.all();
+return { vocabulary: allItems.map(i => i.json) };
+```
+
+✅ **Do** use the **Aggregate** node:
+```json
+{
+  "type": "n8n-nodes-base.aggregate",
+  "parameters": {
+    "aggregate": "aggregateAllItemData",
+    "destinationFieldName": "vocabulary",
+    "options": {}
+  }
+}
+```
+
+### Sub-Workflow Pattern
+
+When calling a workflow as a sub-workflow:
+
+1. **Parent workflow**: Use `Execute Workflow` node with `workflowInputs` mapping
+2. **Child workflow**: Use `Execute Workflow Trigger` node (not Webhook)
+
+```json
+{
+  "type": "n8n-nodes-base.executeWorkflow",
+  "parameters": {
+    "workflowId": { "value": "WORKFLOW_ID" },
+    "workflowInputs": {
+      "mappingMode": "defineBelow",
+      "value": {
+        "word": "={{ $json.word }}",
+        "context": "={{ $json.context }}"
+      }
+    }
+  }
+}
+```
+
+**Note:** When processing multiple items through a sub-workflow, each item is passed separately — use `$itemIndex` in the child workflow to track position if needed.
+
 ## LangChain / AI Nodes
 
 n8n has built-in LangChain nodes for AI workflows. Use these instead of raw HTTP requests to OpenRouter/OpenAI.
@@ -245,31 +320,10 @@ The OpenRouter model connects to Basic LLM Chain via `ai_languageModel`:
         "type": "ai_languageModel",
         "index": 0
       }]]
-    },
-    "Previous Node": {
-      "main": [[{
-        "node": "Basic LLM Chain",
-        "type": "main",
-        "index": 0
-      }]]
     }
   }
 }
 ```
-
-### Passing Prompts
-
-Set the prompt in a Code node before Basic LLM Chain:
-
-```javascript
-// Code node output - use 'chatInput' field for the prompt
-return {
-  chatInput: `Your prompt here with ${$json.variable}`,
-  // ... other fields
-};
-```
-
-The Basic LLM Chain output contains `text` field with the AI response.
 
 ## Reference Files
 
