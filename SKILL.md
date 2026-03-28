@@ -190,6 +190,97 @@ bash skills/n8n/scripts/n8n-api.sh backup-cleanup <workflow-id> 5
 
 **ALWAYS backup before modifying any workflow.** The backup script saves to both n8n (visible in UI) and local disk (for fast rollback). Pre-rollback safety backups are created automatically.
 
+## LangChain / AI Nodes
+
+n8n has built-in LangChain nodes for AI workflows. Use these instead of raw HTTP requests to OpenRouter/OpenAI.
+
+### OpenRouter Chat Model
+
+```json
+{
+  "parameters": {
+    "model": "google/gemini-2.0-flash-001",
+    "options": {}
+  },
+  "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+  "typeVersion": 1,
+  "name": "OpenRouter Chat Model",
+  "credentials": {
+    "openRouterApi": {
+      "id": "CREDENTIAL_ID",
+      "name": "OpenRouter account"
+    }
+  }
+}
+```
+
+### Basic LLM Chain
+
+Connects to an OpenRouter/OpenAI model and runs prompts.
+
+```json
+{
+  "parameters": {
+    "promptType": "auto",
+    "batching": {}
+  },
+  "type": "@n8n/n8n-nodes-langchain.chainLlm",
+  "typeVersion": 1.7,
+  "name": "Basic LLM Chain"
+}
+```
+
+**Important:** With `promptType: "auto"`, the node expects the prompt in a field called `chatInput` from the previous node.
+
+### Connection Pattern
+
+The OpenRouter model connects to Basic LLM Chain via `ai_languageModel`:
+
+```json
+{
+  "connections": {
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [[{
+        "node": "Basic LLM Chain",
+        "type": "ai_languageModel",
+        "index": 0
+      }]]
+    },
+    "Previous Node": {
+      "main": [[{
+        "node": "Basic LLM Chain",
+        "type": "main",
+        "index": 0
+      }]]
+    }
+  }
+}
+```
+
+### Passing Prompts
+
+Set the prompt in a Code node before Basic LLM Chain:
+
+```javascript
+// Code node output - use 'chatInput' field for the prompt
+return {
+  chatInput: `Your prompt here with ${$json.variable}`,
+  // ... other fields
+};
+```
+
+The Basic LLM Chain output contains `text` field with the AI response.
+
+### Available Models (OpenRouter)
+
+| Model | Speed | Cost |
+|-------|-------|------|
+| `google/gemini-2.0-flash-001` | Fast | Low |
+| `google/gemini-flash-1.5` | Fast | Very Low |
+| `anthropic/claude-3-haiku` | Fast | Low |
+| `anthropic/claude-3.5-sonnet` | Medium | Medium |
+| `openai/gpt-4o-mini` | Fast | Low |
+
 ## Reference Files
 
 - **API reference details**: See `references/api-reference.md` for full endpoint documentation
