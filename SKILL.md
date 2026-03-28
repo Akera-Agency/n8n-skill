@@ -199,7 +199,7 @@ n8n has built-in LangChain nodes for AI workflows. Use these instead of raw HTTP
 ```json
 {
   "parameters": {
-    "model": "google/gemini-2.0-flash-001",
+    "model": "google/gemini-3.1-flash-lite-preview",
     "options": {}
   },
   "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
@@ -270,16 +270,6 @@ return {
 ```
 
 The Basic LLM Chain output contains `text` field with the AI response.
-
-### Available Models (OpenRouter)
-
-| Model | Speed | Cost |
-|-------|-------|------|
-| `google/gemini-2.0-flash-001` | Fast | Low |
-| `google/gemini-flash-1.5` | Fast | Very Low |
-| `anthropic/claude-3-haiku` | Fast | Low |
-| `anthropic/claude-3.5-sonnet` | Medium | Medium |
-| `openai/gpt-4o-mini` | Fast | Low |
 
 ## Reference Files
 
